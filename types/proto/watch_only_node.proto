@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+
+// Service definition for managing watch-only related operations for a node on a
+// specific network. This service provides methods for retrieving node
+// information, channels, payments, and other related data without requiring
+// access to the private keys or signing capabilities of the node.
+service WatchOnlyNodeService {
+  // Get the node ID (public key) for a specific network.
+  rpc GetNodeId(GetNodeIdRequest) returns (GetNodeIdResponse) {}
+  // Get the list of channels associated with the node on a specific network.
+  rpc GetChannels(GetChannelsRequest) returns (GetChannelsResponse) {}
+  // Get the list of channels associated with the node and with a specific
+  // counterparty on a specific network.
+  rpc GetChannelsWithCounterparty(GetChannelsWithCounterpartyRequest)
+      returns (GetChannelsWithCounterpartyResponse) {}
+  // Get the details of a specific channel by its ID for a specific network.
+  rpc GetChannel(GetChannelRequest) returns (GetChannelResponse) {}
+  // Get the list of offchain payments associated with the node on a specific
+  // network.
+  rpc GetPayments(GetPaymentsRequest) returns (GetPaymentsResponse) {}
+  // Get the details of a specific offchain payment by its ID for a specific
+  // network.
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse) {}
+}
+
+message GetNodeIdRequest { Network network = 1; }
+
+message GetNodeIdResponse { string node_id = 1; }
+
+message GetChannelsRequest { Network network = 1; }
+
+message GetChannelsResponse { repeated Channel channels = 1; }
+
+message GetChannelsWithCounterpartyRequest {
+  Network network = 1;
+  string counterparty_pubkey = 2;
+}
+
+message GetChannelsWithCounterpartyResponse { repeated Channel channels = 1; }
+
+message GetChannelRequest {
+  Network network = 1;
+  string channel_id = 2;
+}
+
+message GetChannelResponse { Channel channel = 1; }
+
+message GetPaymentsRequest { Network network = 1; }
+
+message GetPaymentsResponse { repeated Payment payments = 1; }
+
+message GetPaymentRequest {
+  Network network = 1;
+  string payment_id = 2;
+}
+
+message GetPaymentResponse { Payment payment = 1; }

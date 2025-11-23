@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+
+// Pricing service definition for retrieving asset prices.
+service PricingService {
+  // Get the fiat price of a specific asset on a specific network.
+  rpc GetAssetFiatPrice(GetAssetFiatPriceRequest)
+      returns (GetAssetFiatPriceResponse) {}
+  // Get the fiat price of an asset by its symbol.
+  rpc GetAssetFiatPriceBySymbol(GetAssetFiatPriceBySymbolRequest)
+      returns (GetAssetFiatPriceBySymbolResponse) {}
+}
+
+message GetAssetFiatPriceRequest {
+  Network network = 1;
+  string asset_id = 2;
+  FiatCurrency fiat_currency = 3;
+}
+
+message GetAssetFiatPriceResponse { optional DecimalString price = 1; }
+
+message GetAssetFiatPriceBySymbolRequest {
+  string asset_symbol = 1;
+  FiatCurrency fiat_currency = 2;
+}
+
+message GetAssetFiatPriceBySymbolResponse { optional DecimalString price = 1; }

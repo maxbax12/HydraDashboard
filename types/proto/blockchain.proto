@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+
+// Service definition for blockchain operations.
+// This service provides methods to interact with blockchain networks.
+service BlockchainService {
+  // Get the current block number for a specific network.
+  rpc GetBlockNumber(GetBlockNumberRequest) returns (GetBlockNumberResponse) {}
+  // Get the block header for a specific block number on a network.
+  rpc GetBlockHeader(GetBlockHeaderRequest) returns (GetBlockHeaderResponse) {}
+  // Get fee estimates for transactions on a specific network.
+  // This is useful for determining transaction costs and creating
+  // efficient transactions based on current network conditions.
+  rpc GetFeeEstimates(GetFeeEstimatesRequest)
+      returns (GetFeeEstimatesResponse) {}
+  // Get the token allowance for a specific token on a network.
+  // This is useful for checking how much of a token an owner has allowed
+  // a spender to use.
+  rpc GetTokenAllowance(GetTokenAllowanceRequest)
+      returns (GetTokenAllowanceResponse) {}
+}
+
+message GetBlockNumberRequest { Network network = 1; }
+
+message GetBlockNumberResponse { uint64 block_number = 1; }
+
+message GetBlockHeaderRequest {
+  Network network = 1;
+  uint64 block_number = 2;
+}
+
+message GetBlockHeaderResponse { BlockHeader block_header = 1; }
+
+message GetFeeEstimatesRequest { Network network = 1; }
+
+message GetFeeEstimatesResponse { FeeEstimate fee_estimate = 1; }
+
+message GetTokenAllowanceRequest {
+  Network network = 1;
+  string token_id = 2;
+  string owner = 3;
+  string spender = 4;
+}
+
+message GetTokenAllowanceResponse { Allowance allowance = 1; }

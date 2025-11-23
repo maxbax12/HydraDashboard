@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+
+// Wallet service definition for managing wallet-related operations.
+// This service provides methods for retrieving balances and transactions
+// associated with a specific network.
+service WalletService {
+  // Get the balances of assets in the wallet for a specific network.
+  // This returns a map of asset IDs to their corresponding onchain and offchain
+  // balances.
+  rpc GetBalances(GetBalancesRequest) returns (GetBalancesResponse) {}
+  // Get the balance of a specific asset in the wallet for a specific network.
+  // This returns the onchain and offchain balances for the specified asset ID.
+  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse) {}
+  // Get the list of transactions associated with the wallet for a specific
+  // network.
+  rpc GetTransactions(GetTransactionsRequest)
+      returns (GetTransactionsResponse) {}
+  // Get the details of a specific transaction by its ID for a specific network.
+  rpc GetTransaction(GetTransactionRequest) returns (GetTransactionResponse) {}
+}
+
+message GetBalancesRequest { Network network = 1; }
+
+message GetBalancesResponse {
+  map<string, Balance> balances = 1; // key: asset_id
+}
+
+message GetBalanceRequest {
+  Network network = 1;
+  string asset_id = 2;
+}
+
+message GetBalanceResponse {
+  Balance balance = 1; // onchain and offchain balances for the specified asset
+}
+
+message GetTransactionsRequest { Network network = 1; }
+
+message GetTransactionsResponse { repeated Transaction transactions = 1; }
+
+message GetTransactionRequest {
+  Network network = 1;
+  string txid = 2;
+}
+
+message GetTransactionResponse { Transaction transaction = 1; }

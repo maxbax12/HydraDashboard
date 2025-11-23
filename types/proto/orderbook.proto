@@ -1,0 +1,602 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+import "google/protobuf/timestamp.proto";
+
+// Orderbook service definition for managing orderbook operations.
+// This service provides methods to initialize markets, manage orders,
+// and retrieve orderbook info and balances.
+service OrderbookService {
+  // Initialize a market with two currencies.
+  // This operation starts a task on the server that will
+  // handle order matches and other market-related operations performing and
+  // resolving swaps. If the provided market pair is invalid, the server
+  // will return None.
+  rpc InitMarket(InitMarketRequest) returns (InitMarketResponse) {}
+  // Get the list of initialized markets.
+  rpc GetInitializedMarkets(GetInitializedMarketsRequest)
+      returns (GetInitializedMarketsResponse) {}
+  // Get the info of the available markets.
+  rpc GetMarketsInfo(GetMarketsInfoRequest) returns (GetMarketsInfoResponse) {}
+  // Get the info of a specific market.
+  rpc GetMarketInfo(GetMarketInfoRequest) returns (GetMarketInfoResponse) {}
+  // Get the orderbook balances for the currencies in the market, including
+  // the available and locked sending and receiving balances.
+  rpc GetOrderbookBalances(GetOrderbookBalancesRequest)
+      returns (GetOrderbookBalancesResponse) {}
+  // Get the orderbook for the specified market.
+  rpc GetOrderbook(GetOrderbookRequest) returns (GetOrderbookResponse) {}
+  // Estimate the order matching for a specific market based on the
+  // order operation that will be performed.
+  rpc EstimateOrder(EstimateOrderRequest) returns (EstimateOrderResponse) {}
+  // Create a new order for a specific market.
+  rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse) {}
+  // Cancel an existing order by its ID.
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse) {}
+  // Cancel all orders in the orderbook.
+  rpc CancelAllOrders(CancelAllOrdersRequest)
+      returns (CancelAllOrdersResponse) {}
+  // Get all own orders in the orderbook.
+  rpc GetAllOwnOrders(GetAllOwnOrdersRequest)
+      returns (GetAllOwnOrdersResponse) {}
+  // Get own orders in the orderbook for a specific market.
+  rpc GetOwnOrders(GetOwnOrdersRequest) returns (GetOwnOrdersResponse) {}
+  // Get a specific order by its ID.
+  rpc GetOrder(GetOrderRequest) returns (GetOrderResponse) {}
+  // Get the public trade history for a specific market.
+  rpc GetTradeHistory(GetTradeHistoryRequest)
+      returns (GetTradeHistoryResponse) {}
+  // Get all the market trades performed by the user in the orderbook.
+  rpc GetAllMarketTrades(GetAllMarketTradesRequest)
+      returns (GetAllMarketTradesResponse) {}
+  // Get the trades performed by the user in a specific market.
+  rpc GetPairMarketTrades(GetPairMarketTradesRequest)
+      returns (GetPairMarketTradesResponse) {}
+  // Get all the swap trades performed by the user in the orderbook.
+  rpc GetAllSwapTrades(GetAllSwapTradesRequest)
+      returns (GetAllSwapTradesResponse) {}
+  // Get the swap trades performed by the user for a specific pair of
+  // currencies.
+  rpc GetPairSwapTrades(GetPairSwapTradesRequest)
+      returns (GetPairSwapTradesResponse) {}
+  // This method is used to subscribe to the updates of a market.
+  // The user will receive updates about the market activity, including
+  // order book changes, trade executions, stats and candlestick updates.
+  rpc SubscribeMarketEvents(SubscribeMarketEventsRequest)
+      returns (stream MarketEvent) {}
+  // This method is used to subscribe to the dex events.
+  // The user will receive updates about their own orders, trades, and balances.
+  rpc SubscribeDexEvents(SubscribeDexEventsRequest) returns (stream DexEvent) {}
+}
+
+enum OrderSide {
+  BUY = 0;
+  SELL = 1;
+}
+
+enum OrderType {
+  LIMIT = 0;
+  LIQUIDITY = 1;
+  MARKET = 2;
+  SWAP = 3;
+}
+
+enum AmountSide {
+  BASE = 0;
+  QUOTE = 1;
+}
+
+message OrderAmount {
+  message Base { DecimalString amount = 1; }
+  message Quote { DecimalString amount = 1; }
+
+  oneof amount {
+    Base base = 1;
+    Quote quote = 2;
+  }
+}
+
+message CurrencyInfo {
+  Protocol protocol = 1;
+  string network_id = 2;
+  string asset_id = 3;
+  uint32 decimals = 4;
+}
+
+message CurrencyInfoPair {
+  CurrencyInfo base = 1;
+  CurrencyInfo quote = 2;
+}
+
+message MarketInfo {
+  CurrencyInfo base = 1;
+  CurrencyInfo quote = 2;
+  DecimalString taker_base_fee = 3;
+  DecimalString taker_quote_fee = 4;
+  DecimalString maker_base_fee = 5;
+  DecimalString maker_quote_fee = 6;
+  uint32 base_precision = 7;
+  uint32 quote_precision = 8;
+  DecimalString min_base_amount = 9;
+  DecimalString min_quote_amount = 10;
+}
+
+message OrderbookBalance {
+  OrderbookCurrency currency = 1;
+  CurrencyBalance balance = 2;
+}
+
+message CurrencyBalance {
+  DecimalString sending = 1;
+  DecimalString receiving = 2;
+  DecimalString pending_sending = 3;
+  DecimalString pending_receiving = 4;
+  DecimalString unavailable_sending = 5;
+  DecimalString unavailable_receiving = 6;
+  DecimalString in_use_sending = 7;
+  DecimalString in_use_receiving = 8;
+}
+
+message LiquidityPosition {
+  bytes client_pubkey = 1;
+  DecimalString min_buy_price = 2;
+  DecimalString quote_amount = 3;
+  DecimalString max_buy_price = 4;
+  DecimalString inactive_quote_amount = 5;
+  DecimalString highest_buy_price = 6;
+  DecimalString lowest_sell_price = 7;
+  DecimalString inactive_base_amount = 8;
+  DecimalString min_sell_price = 9;
+  DecimalString base_amount = 10;
+  DecimalString max_sell_price = 11;
+  bool remove_on_fill = 12;
+}
+
+message Orderbook {
+  MarketInfo info = 1;
+  map<string, LiquidityPosition> orders = 2;
+}
+
+message OrderVariant {
+  message AddLiquidity {
+    OrderbookCurrency base = 1;
+    OrderbookCurrency quote = 2;
+    DecimalString min_buy_price = 3;
+    DecimalString mid_price = 4;
+    DecimalString max_sell_price = 5;
+    OrderAmount amount = 6;
+    // remove the liquidity as soon as some part is filled
+    bool remove_on_fill = 7;
+  }
+
+  message MarketOrder {
+    OrderbookCurrency base = 1;
+    OrderbookCurrency quote = 2;
+    OrderAmount amount = 3;
+    OrderSide side = 4;
+  }
+
+  message SwapOrder {
+    OrderbookCurrency from_currency = 1;
+    repeated OrderbookCurrency currency_path = 2;
+    OrderbookCurrency to_currency = 3;
+    SwapAmount amount = 4;
+  }
+
+  oneof order_variant {
+    AddLiquidity add_liquidity = 1;
+    MarketOrder market_order = 2;
+    SwapOrder swap_order = 3;
+  }
+}
+
+// Represents an order that adds liquidity to a pair of currencies in the
+// orderbook.
+message LiquidityOrder {
+  OrderbookCurrency base = 1;
+  OrderbookCurrency quote = 2;
+  google.protobuf.Timestamp created_at = 3;
+  DecimalString min_buy_price = 4;
+  DecimalString max_buy_price = 5;
+  DecimalString min_sell_price = 6;
+  DecimalString max_sell_price = 7;
+  DecimalString remaining_base_amount = 8;
+  DecimalString remaining_quote_amount = 9;
+  DecimalString sold_base_amount = 10;
+  DecimalString bought_base_amount = 11;
+  DecimalString sold_quote_amount = 12;
+  DecimalString bought_quote_amount = 13;
+  DecimalString paid_base_fee = 14;
+  DecimalString paid_quote_fee = 15;
+  bool remove_on_fill = 16;
+}
+
+// Represents a market order for a pair of currencies in the orderbook.
+// A market order is an order to buy or sell a currency at the best available
+// price in the orderbook.
+message MarketOrder {
+  message Buy {
+    DecimalString bought_base_amount = 1;
+    DecimalString sold_quote_amount = 2;
+    DecimalString paid_base_fee = 3;
+  }
+
+  message Sell {
+    DecimalString sold_base_amount = 1;
+    DecimalString bought_quote_amount = 2;
+    DecimalString paid_quote_fee = 3;
+  }
+
+  OrderbookCurrency base = 1;
+  OrderbookCurrency quote = 2;
+  google.protobuf.Timestamp created_at = 3;
+  OrderAmount remaining_amount = 4;
+  OrderAmount unmatched_amount = 5;
+  OrderAmount failed_amount = 6;
+
+  oneof order_variant {
+    Buy buy = 7;
+    Sell sell = 8;
+  }
+}
+
+// Represents an order for a pair of currencies in the orderbook.
+// It can either be a liquidity order or a market order.
+// Liquidity orders are used to add liquidity to the orderbook, while market
+// orders are used to buy or sell currencies at the best available price.
+message PairOrder {
+  oneof order {
+    LiquidityOrder liquidity_order = 1;
+    MarketOrder market_order = 2;
+  }
+}
+
+// Represents an order for swapping one currency for another.
+// It can involve multiple pair orders in a path to achieve the swap.
+// The swap order contains information about the currencies involved, the
+// created timestamp, the remaining amount to be swapped, and the amounts
+// sold and bought in the swap, including any fees paid.
+message SwapOrder {
+  OrderbookCurrency from_currency = 1;
+  repeated OrderbookCurrency currency_path = 2;
+  OrderbookCurrency to_currency = 3;
+  google.protobuf.Timestamp created_at = 4;
+  SwapAmount remaining_amount = 5;
+  SwapAmount unmatched_amount = 6;
+  SwapAmount failed_amount = 7;
+  DecimalString sold_from_currency_amount = 8;
+  DecimalString bought_to_currency_amount = 9;
+  DecimalString paid_to_currency_fee = 10;
+}
+
+// Represents an order that can be either a pair order or a swap order.
+message Order {
+  oneof order {
+    PairOrder pair_order = 1;
+    SwapOrder swap_order = 2;
+  }
+}
+
+message Trade {
+  string taker_order_id = 1;
+  DecimalString base_amount = 2;
+  DecimalString quote_amount = 3;
+  DecimalString price = 4;
+  DecimalString final_price = 5;
+  google.protobuf.Timestamp timestamp = 6;
+  OrderSide maker_order_side = 7;
+}
+
+message ClientMarketTrade {
+  string swap_id = 1;
+  string order_id = 2;
+  DecimalString base_amount = 3;
+  DecimalString quote_amount = 4;
+  DecimalString base_fee = 5;
+  DecimalString quote_fee = 6;
+  DecimalString price = 7;
+  DecimalString final_price = 8;
+  google.protobuf.Timestamp timestamp = 9;
+  OrderSide order_side = 10;
+  OrderType order_type = 11;
+}
+
+message ClientSwapTrade {
+  string swap_id = 1;
+  string order_id = 2;
+  DecimalString from_currency_amount = 3;
+  DecimalString to_currency_amount = 4;
+  DecimalString to_currency_fee = 5;
+  google.protobuf.Timestamp timestamp = 6;
+}
+
+message InitMarketRequest {
+  OrderbookCurrency first_currency = 1;
+  OrderbookCurrency other_currency = 2;
+}
+
+message InitMarketResponse { optional MarketInfo market_info = 1; }
+
+message GetInitializedMarketsRequest {}
+
+message GetInitializedMarketsResponse { repeated CurrencyInfoPair markets = 1; }
+
+message GetMarketsInfoRequest {}
+
+message GetMarketsInfoResponse { repeated MarketInfo markets = 1; }
+
+message GetMarketInfoRequest {
+  OrderbookCurrency first_currency = 1;
+  OrderbookCurrency other_currency = 2;
+}
+
+message GetMarketInfoResponse { optional MarketInfo market_info = 1; }
+
+message GetOrderbookBalancesRequest {}
+
+message GetOrderbookBalancesResponse { repeated OrderbookBalance balances = 1; }
+
+message GetOrderbookRequest {
+  OrderbookCurrency base = 1;
+  OrderbookCurrency quote = 2;
+}
+
+message GetOrderbookResponse { optional Orderbook orderbook = 1; }
+
+message EstimateOrderRequest { OrderVariant order_variant = 1; }
+
+message EstimateOrderResponse { optional OrderMatch order_match = 1; }
+
+message CreateOrderRequest { OrderVariant order_variant = 1; }
+
+message CreateOrderResponse { string order_id = 1; }
+
+message CancelOrderRequest { string order_id = 1; }
+
+message CancelOrderResponse { bool removed = 1; }
+
+message CancelAllOrdersRequest {}
+
+message CancelAllOrdersResponse {}
+
+message GetOwnOrdersRequest {
+  OrderbookCurrency base = 1;
+  OrderbookCurrency quote = 2;
+}
+
+message GetOwnOrdersResponse {
+  map<string, Order> orders = 1; // key: order_id
+}
+
+message GetAllOwnOrdersRequest {}
+
+message GetAllOwnOrdersResponse {
+  map<string, Order> orders = 1; // key: order_id
+}
+
+message GetOrderRequest { string order_id = 1; }
+
+message GetOrderResponse { Order order = 1; }
+
+message GetTradeHistoryRequest {
+  OrderbookCurrency base = 1;
+  OrderbookCurrency quote = 2;
+}
+
+message GetTradeHistoryResponse {
+  // The trade history for the specified market.
+  // Sorted by timestamp in descending order.
+  // The most recent trades are at the beginning of the list.
+  repeated Trade trade_history = 1;
+}
+
+message GetAllMarketTradesRequest {}
+
+message GetAllMarketTradesResponse {
+  message PairMarketTrades {
+    OrderbookCurrency base = 1;
+    OrderbookCurrency quote = 2;
+    repeated ClientMarketTrade trades = 3;
+  }
+
+  repeated PairMarketTrades pair_market_trades = 1;
+}
+
+message GetPairMarketTradesRequest {
+  OrderbookCurrency base = 1;
+  OrderbookCurrency quote = 2;
+}
+
+message GetPairMarketTradesResponse {
+  // The trades performed by the user in the specified market.
+  // Sorted by timestamp in descending order.
+  // The most recent trades are at the beginning of the list.
+  repeated ClientMarketTrade trades = 1;
+}
+
+message GetAllSwapTradesRequest {}
+
+message GetAllSwapTradesResponse {
+  message PairSwapTrades {
+    OrderbookCurrency from_currency = 1;
+    OrderbookCurrency to_currency = 2;
+    repeated ClientSwapTrade trades = 3;
+  }
+
+  repeated PairSwapTrades pair_swap_trades = 1;
+}
+
+message GetPairSwapTradesRequest {
+  OrderbookCurrency from_currency = 1;
+  OrderbookCurrency to_currency = 2;
+}
+
+message GetPairSwapTradesResponse {
+  // The swap trades performed by the user for the specified pair of currencies.
+  // Sorted by timestamp in descending order.
+  // The most recent trades are at the beginning of the list.
+  repeated ClientSwapTrade trades = 1;
+}
+
+message OrderbookUpdate {
+  map<string, LiquidityPosition> updated_orders = 1; // order_id -> update
+  repeated string removed_orders = 2;                // order_ids
+}
+
+message MarketVolatility {
+  DecimalString first_price = 1;
+  DecimalString last_price = 2;
+  DecimalString high_price = 3;
+  DecimalString low_price = 4;
+  DecimalString base_volume = 5;
+  DecimalString quote_volume = 6;
+}
+
+message MarketDailyStats { MarketVolatility volatility = 2; }
+
+enum CandlestickInterval {
+  ONE_MINUTE = 0;
+  THREE_MINUTES = 1;
+  FIVE_MINUTES = 2;
+  FIFTEEN_MINUTES = 3;
+  THIRTY_MINUTES = 4;
+  ONE_HOUR = 5;
+  TWO_HOURS = 6;
+  FOUR_HOURS = 7;
+  SIX_HOURS = 8;
+  EIGHT_HOURS = 9;
+  TWELVE_HOURS = 10;
+  ONE_DAY = 11;
+  THREE_DAYS = 12;
+  ONE_WEEK = 13;
+  ONE_MONTH = 14;
+}
+
+message Candlestick {
+  google.protobuf.Timestamp timestamp = 1;
+  DecimalString open = 2;
+  DecimalString close = 3;
+  DecimalString high = 4;
+  DecimalString low = 5;
+  DecimalString base_volume = 6;
+  DecimalString quote_volume = 7;
+}
+
+message CandlestickUpdate {
+  CandlestickInterval interval = 1;
+  Candlestick candlestick = 2;
+}
+
+message MarketEvent {
+  oneof update {
+    bool is_synced = 1;
+    OrderbookUpdate orderbook_update = 2;
+    Trade trade_update = 3;
+    MarketDailyStats daily_stats_update = 4;
+    CandlestickUpdate candlestick_update = 5;
+  }
+}
+
+message BalanceUpdate {
+  OrderbookCurrency currency = 1;
+  CurrencyBalance balance = 2;
+}
+
+message OrderUpdate {
+  message OrderCreated {
+    string order_id = 1;
+    Order order = 2;
+  }
+  message OrderUpdated {
+    string order_id = 1;
+    Order order = 2;
+  }
+  message OrderCompleted { string order_id = 1; }
+  message OrderCanceled { string order_id = 1; }
+
+  oneof update {
+    OrderCreated order_created = 1;
+    OrderUpdated order_updated = 2;
+    OrderCompleted order_completed = 3;
+    OrderCanceled order_canceled = 4;
+  }
+}
+
+message SwapHop {
+  OrderbookCurrency sending_currency = 1;
+  OrderbookCurrency receiving_currency = 2;
+  DecimalString sending_amount = 3;
+  DecimalString receiving_amount = 4;
+  DecimalString receiving_fee = 5;
+}
+
+message SwapPath {
+  string swap_id = 1;
+  SwapHop first_hop = 2;
+  repeated SwapHop next_hops = 3;
+}
+
+message MatchedOrder {
+  string own_order_id = 1;
+  repeated SwapPath swap_route = 2;
+  bool is_taker = 3;
+}
+
+enum SwapStatus {
+  ORDER_MATCHED = 0;
+  RECEIVING_INVOICE_CREATED = 1;
+  PAYING_INVOICE_RECEIVED = 2;
+  PAYMENT_SENT = 3;
+  PAYMENT_RECEIVED = 4;
+  PAYMENT_CLAIMED = 5;
+  PAYMENT_CLAIMED_BY_COUNTERPARTY = 6;
+  SWAP_COMPLETED = 7;
+  SWAP_FAILED = 8;
+}
+
+message SwapUpdate {
+  string order_id = 1;
+  string swap_id = 2;
+  SwapProgress progress = 3;
+}
+
+message SwapProgress {
+  DecimalString receiving_amount = 1;
+  DecimalString paying_amount = 2;
+  SwapStatus status = 3;
+  optional string error = 4;
+}
+
+message MarketTradeUpdate {
+  OrderbookCurrency base = 1;
+  OrderbookCurrency quote = 2;
+  ClientMarketTrade trade = 3;
+}
+
+message SwapTradeUpdate {
+  OrderbookCurrency from_currency = 1;
+  OrderbookCurrency to_currency = 2;
+  ClientSwapTrade trade = 3;
+}
+
+message DexEvent {
+  google.protobuf.Timestamp timestamp = 1;
+  oneof update {
+    bool is_synced = 2;
+    BalanceUpdate balance_update = 3;
+    OrderUpdate order_update = 4;
+    MatchedOrder order_matched = 5;
+    SwapUpdate swap_update = 6;
+    MarketTradeUpdate market_trade_update = 7;
+    SwapTradeUpdate swap_trade_update = 8;
+  }
+}
+
+message SubscribeMarketEventsRequest {
+  OrderbookCurrency base = 1;
+  OrderbookCurrency quote = 2;
+}
+
+message SubscribeDexEventsRequest {}

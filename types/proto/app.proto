@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+
+// General application service definition.
+service AppService {
+  // Get the list of active networks in the application.
+  rpc GetNetworks(GetNetworksRequest) returns (GetNetworksResponse) {}
+  // Get the public key of the running application instance.
+  rpc GetPublicKey(GetPublicKeyRequest) returns (GetPublicKeyResponse) {}
+}
+
+message GetNetworksRequest {}
+
+message GetNetworksResponse { repeated Network networks = 1; }
+
+message GetPublicKeyRequest {}
+
+message GetPublicKeyResponse { bytes public_key = 1; }

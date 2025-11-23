@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+
+// Client service definition for managing client-specific operations.
+service ClientService {
+  // Get the deposit address for a specific network.
+  // This is useful for receiving funds on the specified network.
+  rpc GetDepositAddress(GetDepositAddressRequest)
+      returns (GetDepositAddressResponse) {}
+  // Send a transaction on a specific network.
+  // This is used to transfer only the native asset of the network to another
+  // address.
+  // If you want to transfer a token, use the SendTokenTransaction method.
+  rpc SendTransaction(SendTransactionRequest)
+      returns (SendTransactionResponse) {}
+  // Bumps the fee of an existing tx
+  rpc BumpTransaction(BumpTransactionRequest)
+      returns (BumpTransactionResponse) {}
+  // Send a token transaction on a specific network.
+  // This is used to transfer a token from one address to another.
+  // If you want to transfer the native asset of the network, use the
+  // SendTransaction method.
+  rpc SendTokenTransaction(SendTokenTransactionRequest)
+      returns (SendTokenTransactionResponse) {}
+  // Set the token allowance for a specific token on a network.
+  // This is useful for allowing a spender to use a certain amount of
+  // a token on behalf of the owner.
+  rpc SetTokenAllowance(SetTokenAllowanceRequest)
+      returns (SetTokenAllowanceResponse) {}
+}
+
+message GetDepositAddressRequest { Network network = 1; }
+
+message GetDepositAddressResponse { string address = 1; }
+
+message SendTransactionRequest {
+  Network network = 1;
+  string to_address = 2;
+  SendAmount amount = 3;
+  FeeOption fee_option = 4;
+}
+
+message SendTransactionResponse { string txid = 1; }
+
+message BumpTransactionResponse { string txid = 1; }
+
+message BumpTransactionRequest {
+  Network network = 1;
+  string txid = 2;
+  FeeOption fee_option = 3;
+}
+
+message SendTokenTransactionRequest {
+  Network network = 1;
+  string to_address = 2;
+  string token_id = 3;
+  SendAmount amount = 4;
+  FeeOption fee_option = 5;
+}
+
+message SendTokenTransactionResponse { string txid = 1; }
+
+message SetTokenAllowanceRequest {
+  Network network = 1;
+  string spender = 2;
+  SetAllowance allowance = 3;
+  FeeOption fee_option = 5;
+}
+
+message SetTokenAllowanceResponse { string txid = 1; }

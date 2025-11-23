@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+
+// Rental service definition for renting channels and managing
+// rentals.
+service RentalService {
+  // Get the rental info from the node. This includes the
+  // min/max rental amounts, duration, and the rental fees for the different
+  // assets.
+  rpc GetRentalNodeInfo(GetRentalNodeInfoRequest)
+      returns (GetRentalNodeInfoResponse) {}
+  // Get the rental info for a specific asset. This includes the
+  // available asset liquidity, the min/max rental amounts, duration, and the
+  // rental fee for the asset.
+  rpc GetRentableAssetInfo(GetRentableAssetInfoRequest)
+      returns (GetRentableAssetInfoResponse) {}
+  // Rent a channel for a specific asset specifiying the amount of inbound
+  // liquidity, the rental lifetime, and the payment option to rent the channel.
+  // This is useful when the user needs inbound liquidity for a specific asset
+  // to be able to receive payments from other users, for example when receiving
+  // the asset in a swap.
+  rpc RentChannel(RentChannelRequest) returns (RentChannelResponse) {}
+  // Estimate the rental fee for a specific asset, amount and duration.
+  // This is useful to know the rental fee before renting the channel.
+  rpc EstimateRentChannelFee(EstimateRentChannelFeeRequest)
+      returns (EstimateRentChannelFeeResponse) {}
+}
+
+message GetRentalNodeInfoRequest {}
+
+message RentalAssetConfig {
+  Network network = 1;
+  string asset_id = 2;
+  DecimalString rental_fee_ratio = 3;
+  optional string pricing_ticker = 4;
+}
+
+message GetRentalNodeInfoResponse {
+  uint64 min_duration_seconds = 1;
+  uint64 max_duration_seconds = 2;
+  DecimalString min_capacity_usd = 3;
+  DecimalString max_capacity_usd = 4;
+  repeated RentalAssetConfig rental_assets = 5;
+}
+
+message GetRentableAssetInfoRequest {
+  Network network = 1;
+  string asset_id = 2;
+}
+
+message GetRentableAssetInfoResponse {
+  DecimalString available_liquidity = 1;
+  DecimalString min_capacity = 2;
+  DecimalString max_capacity = 3;
+  uint64 min_duration_seconds = 4;
+  uint64 max_duration_seconds = 5;
+  DecimalString rental_fee_ratio = 6;
+}
+
+enum PaymentMethod {
+  ONCHAIN = 0;
+  OFFCHAIN = 1;
+}
+
+message RentalOption {
+  message Payment {
+    FeeRate rental_tx_fee_rate = 1;
+    Network payment_network = 2;
+    string payment_asset_id = 3;
+    PaymentMethod payment_method = 4;
+  }
+  message DualFund { DecimalString self_amount = 1; }
+
+  oneof option {
+    Payment payment = 1;
+    DualFund dual_fund = 2;
+  }
+}
+
+message RentChannelRequest {
+  Network network = 1;
+  string asset_id = 2;
+  uint64 lifetime_seconds = 3;
+  DecimalString amount = 4;
+  RentalOption rental_option = 5;
+}
+
+message RentalPayment {
+  message Onchain {
+    string payment_txid = 1;
+    string deposit_address = 2;
+    DecimalString fee_amount = 3;
+    bytes metadata = 4;
+  }
+  message Offchain {
+    string payment_id = 1;
+    string payment_request = 2;
+  }
+
+  oneof payment {
+    Onchain onchain = 1;
+    Offchain offchain = 2;
+  }
+}
+
+message RentChannelResponse {
+  string rental_txid = 1;
+  string rented_channel_id = 2;
+  RentalPayment rental_payment = 3;
+}
+
+message EstimateRentChannelFeeRequest {
+  Network network = 1;
+  string asset_id = 2;
+  uint64 lifetime_seconds = 3;
+  DecimalString amount = 4;
+  RentalOption rental_option = 5;
+}
+
+message EstimateRentChannelFeeResponse { DecimalString fee = 1; }

@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+
+// Service definition for asset management.
+// This service provides methods to retrieve and manage assets on different
+// networks.
+service AssetService {
+  // Get the list of assets available on a specific network.
+  rpc GetAssets(GetAssetsRequest) returns (GetAssetsResponse) {}
+  // Get details of a specific asset on a specific network by its ID.
+  rpc GetAsset(GetAssetRequest) returns (GetAssetResponse) {}
+  // Get the native asset of a specific network.
+  rpc GetNativeAsset(GetNativeAssetRequest) returns (GetAssetResponse) {}
+  // Add and register a new token on a specific network by its ID.
+  rpc AddToken(AddTokenRequest) returns (AddTokenResponse) {}
+}
+
+message GetAssetsRequest { Network network = 1; }
+
+message GetAssetsResponse { repeated Asset assets = 1; }
+
+message GetAssetRequest {
+  Network network = 1;
+  string asset_id = 2;
+}
+
+message GetAssetResponse { Asset asset = 1; }
+
+message GetNativeAssetRequest { Network network = 1; }
+
+message AddTokenRequest {
+  Network network = 1;
+  string token_id = 2;
+}
+
+message AddTokenResponse { Asset asset = 1; }

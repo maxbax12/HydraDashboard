@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+
+// Event service definition for managing events related to clients and nodes.
+service EventService {
+  // Subscribe to client events for a specific network.
+  // This allows clients to receive real-time updates about events
+  // occurring on the network, such as sync status, new blocks, transaction
+  // updates, and balance changes.
+  rpc SubscribeClientEvents(SubscribeClientEventsRequest)
+      returns (stream ClientEvent) {}
+  // Subscribe to node events for a specific network.
+  // This allows clients to receive real-time updates about events
+  // occurring on the node, such as sync status, peer connections and
+  // disconnections, channel updates, and payment updates.
+  rpc SubscribeNodeEvents(SubscribeNodeEventsRequest)
+      returns (stream NodeEvent) {}
+}
+
+message SubscribeClientEventsRequest { Network network = 1; }
+
+message SubscribeNodeEventsRequest { Network network = 1; }

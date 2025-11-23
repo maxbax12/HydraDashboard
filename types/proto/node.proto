@@ -1,0 +1,364 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+
+// Node service definition for managing node-specific operations.
+// This service provides methods to manage channels, payments, and
+// connections to peers on different networks.
+service NodeService {
+  // Connect to a peer on a specific network.
+  // This allows the node to establish a connection with another node
+  // for communication and channel management.
+  rpc ConnectToPeer(ConnectToPeerRequest) returns (ConnectToPeerResponse) {}
+  // Get the list of connected peers on a specific network.
+  rpc GetConnectedPeers(GetConnectedPeersRequest)
+      returns (GetConnectedPeersResponse) {}
+  // Estimate the onchain fee for opening a channel with a specific peer.
+  rpc EstimateOpenChannelFee(EstimateOpenChannelFeeRequest)
+      returns (EstimateOpenChannelFeeResponse) {}
+  // Open a channel with a specific peer on a specific network.
+  // This operation will create a channel and allocate assets to it.
+  // The channel will be funded with the specified asset amounts.
+  rpc OpenChannel(OpenChannelRequest) returns (OpenChannelResponse) {}
+  // Estimate the onchain fee for depositing assets into an existing channel.
+  rpc EstimateDepositChannelFee(EstimateDepositChannelFeeRequest)
+      returns (EstimateDepositChannelFeeResponse) {}
+  // Deposit assets into an existing channel on a specific network.
+  // This operation will add more assets to the channel, increasing its
+  // capacity for future transactions.
+  rpc DepositChannel(DepositChannelRequest) returns (DepositChannelResponse) {}
+  // Estimate the onchain fee for withdrawing assets from an existing channel.
+  rpc EstimateWithdrawChannelFee(EstimateWithdrawChannelFeeRequest)
+      returns (EstimateWithdrawChannelFeeResponse) {}
+  // Withdraw assets from an existing channel on a specific network.
+  // This operation will remove assets from the channel, reducing its
+  // capacity for future transactions.
+  // The assets will be sent back to the respective parties.
+  rpc WithdrawChannel(WithdrawChannelRequest)
+      returns (WithdrawChannelResponse) {}
+  // Estimate the onchain fee for closing a channel.
+  rpc EstimateCloseChannelFee(EstimateCloseChannelFeeRequest)
+      returns (EstimateCloseChannelFeeResponse) {}
+  // Close a channel on a specific network.
+  // This operation will settle the channel and return the assets to
+  // the respective parties.
+  rpc CloseChannel(CloseChannelRequest) returns (CloseChannelResponse) {}
+  // Estimate the onchain fee for force-closing a channel.
+  rpc EstimateForceCloseChannelFee(EstimateForceCloseChannelFeeRequest)
+      returns (EstimateForceCloseChannelFeeResponse) {}
+  // Force-close a channel on a specific network.
+  // This operation will close the channel without waiting for the
+  // normal settlement process. It is typically used in cases where
+  // the channel is stuck or one party is unresponsive.
+  // The assets will be spendable only after a dispute period.
+  // Depending on the protocol, this may require an additional
+  // transaction to redeem the assets after the dispute period expires.
+  // This operation may incur higher fees than a normal close.
+  rpc ForceCloseChannel(ForceCloseChannelRequest)
+      returns (ForceCloseChannelResponse) {}
+  // Estimate the onchain fee for redeeming a closed channel.
+  rpc EstimateRedeemClosedChannelFee(EstimateRedeemClosedChannelFeeRequest)
+      returns (EstimateRedeemClosedChannelFeeResponse) {}
+  // Redeem a closed channel on a specific network.
+  // This operation will settle the channel and return the assets to
+  // the respective parties. It is used after a force-close
+  // operation to finalize the settlement process and withdraw the
+  // assets from the channel.
+  rpc RedeemClosedChannel(RedeemClosedChannelRequest)
+      returns (RedeemClosedChannelResponse) {}
+  // Waits for an asset channel to updatable and/or active for sending/receiving
+  // funds.
+  rpc WaitForActiveAssetChannel(WaitForActiveAssetChannelRequest)
+      returns (WaitForActiveAssetChannelResponse) {}
+  // Send a payment through a specific channel on a specific network.
+  rpc SendChannelPayment(SendChannelPaymentRequest)
+      returns (SendChannelPaymentResponse) {}
+  // Estimate the offchain fee for sending a payment on a
+  // network. This operation will find the best route for the payment
+  // and calculate the fee for sending the payment through the
+  // network.
+  rpc EstimateSendPaymentFee(EstimateSendPaymentFeeRequest)
+      returns (EstimateSendPaymentFeeResponse) {}
+  // Send a payment on a specific network. This operation will find the
+  // best route for the payment and send the payment through the
+  // network. The payment will be routed through the channels and
+  // nodes in the network to reach the recipient.
+  rpc SendPayment(SendPaymentRequest) returns (SendPaymentResponse) {}
+  // Create an invoice for a specific asset on a network.
+  // This operation will generate a payment request that can be
+  // shared with the payer.
+  rpc CreateInvoice(CreateInvoiceRequest) returns (CreateInvoiceResponse) {}
+  // Decode an invoice to retrieve its details.
+  rpc DecodeInvoice(DecodeInvoiceRequest) returns (DecodeInvoiceResponse) {}
+  // Estimate the offchain fee for paying an invoice.
+  rpc EstimatePayInvoiceFee(EstimatePayInvoiceFeeRequest)
+      returns (EstimatePayInvoiceFeeResponse) {}
+  // Pay an invoice on a specific network.
+  rpc PayInvoice(PayInvoiceRequest) returns (PayInvoiceResponse) {}
+  // Estimate the offchain fee for paying an empty invoice by providing the
+  // amount to pay.
+  rpc EstimatePayEmptyInvoiceFee(EstimatePayEmptyInvoiceFeeRequest)
+      returns (EstimatePayEmptyInvoiceFeeResponse) {}
+  // Pay an empty invoice on a specific network by providing the
+  // amount to pay.
+  rpc PayEmptyInvoice(PayEmptyInvoiceRequest)
+      returns (PayEmptyInvoiceResponse) {}
+  // Resolve a hashlock payment by providing the payment preimage.
+  // This operation will finalize the offchain payment and allow the recipient
+  // to claim the funds.
+  rpc ResolveHashlockPayment(ResolveHashlockPaymentRequest)
+      returns (ResolveHashlockPaymentResponse) {}
+  // Reject a hashlock payment on a specific network.
+  // This operation will cancel the payment and unlock the funds for
+  // the sender.
+  rpc RejectPayment(RejectPaymentRequest) returns (RejectPaymentResponse) {}
+  // Allow dual-funded channels for a specific peer on a network.
+  // This operation will add the specified asset amounts for the channel to a
+  // whitelist and allow the counterparty to dual-fund the channel with those
+  // assets when opening a channel. This allows to dual-fund the channel with a
+  // single transaction, instead of two separate transactions, saving on fees.
+  rpc AllowDualFundedChannel(AllowDualFundedChannelRequest)
+      returns (AllowDualFundedChannelResponse) {}
+}
+
+message ConnectToPeerRequest {
+  Network network = 1;
+  string peer_url = 2;
+}
+
+message ConnectToPeerResponse {}
+
+message GetConnectedPeersRequest { Network network = 1; }
+
+message GetConnectedPeersResponse { repeated string node_ids = 1; }
+
+message EstimateOpenChannelFeeRequest {
+  Network network = 1;
+  string node_id = 2;
+  map<string, SendAmount> asset_amounts = 3; // key: asset_id
+  FeeOption fee_option = 4;
+}
+
+message EstimateOpenChannelFeeResponse { DecimalString fee = 1; }
+
+message OpenChannelRequest {
+  Network network = 1;
+  string node_id = 2;
+  map<string, SendAmount> asset_amounts = 3; // key: asset_id
+  FeeOption fee_option = 4;
+}
+
+message OpenChannelResponse {
+  string txid = 1;
+  string channel_id = 2;
+}
+
+message EstimateDepositChannelFeeRequest {
+  Network network = 1;
+  string channel_id = 2;
+  map<string, SendAmount> asset_amounts = 3; // key: asset_id
+  FeeOption fee_option = 4;
+}
+
+message EstimateDepositChannelFeeResponse { DecimalString fee = 1; }
+
+message DepositChannelRequest {
+  Network network = 1;
+  string channel_id = 2;
+  map<string, SendAmount> asset_amounts = 3; // key: asset_id
+  FeeOption fee_option = 4;
+}
+
+message DepositChannelResponse { string txid = 1; }
+
+message WithdrawAmount {
+  SendAmount self_withdrawal = 1;
+  SendAmount counterparty_withdrawal = 2;
+}
+
+message EstimateWithdrawChannelFeeRequest {
+  Network network = 1;
+  string channel_id = 2;
+  map<string, WithdrawAmount> asset_amounts = 3; // key: asset_id
+  FeeOption fee_option = 4;
+}
+
+message EstimateWithdrawChannelFeeResponse { DecimalString fee = 1; }
+
+message WithdrawChannelRequest {
+  Network network = 1;
+  string channel_id = 2;
+  map<string, WithdrawAmount> asset_amounts = 3; // key: asset_id
+  FeeOption fee_option = 4;
+}
+
+message WithdrawChannelResponse { string txid = 1; }
+
+message EstimateCloseChannelFeeRequest {
+  Network network = 1;
+  string channel_id = 2;
+  repeated string asset_ids = 3;
+  FeeOption fee_option = 4;
+}
+
+message EstimateCloseChannelFeeResponse { DecimalString fee = 1; }
+
+message CloseChannelRequest {
+  Network network = 1;
+  string channel_id = 2;
+  repeated string asset_ids = 3;
+  FeeOption fee_option = 4;
+}
+
+message CloseChannelResponse { string txid = 1; }
+
+message EstimateForceCloseChannelFeeRequest {
+  Network network = 1;
+  string channel_id = 2;
+  repeated string asset_ids = 3;
+  FeeOption fee_option = 4;
+}
+
+message EstimateForceCloseChannelFeeResponse { DecimalString fee = 1; }
+
+message ForceCloseChannelRequest {
+  Network network = 1;
+  string channel_id = 2;
+  repeated string asset_ids = 3;
+  FeeOption fee_option = 4;
+}
+
+message ForceCloseChannelResponse { string txid = 1; }
+
+message EstimateRedeemClosedChannelFeeRequest {
+  Network network = 1;
+  string channel_id = 2;
+  repeated string asset_ids = 3;
+  FeeOption fee_option = 4;
+}
+
+message EstimateRedeemClosedChannelFeeResponse { DecimalString fee = 1; }
+
+message RedeemClosedChannelRequest {
+  Network network = 1;
+  string channel_id = 2;
+  repeated string asset_ids = 3;
+  FeeOption fee_option = 4;
+}
+
+message RedeemClosedChannelResponse { string txid = 1; }
+
+message WaitForActiveAssetChannelRequest {
+  Network network = 1;
+  string channel_id = 2;
+  string asset_id = 3;
+  bool active_sending = 4;
+  bool active_receiving = 5;
+  bool updatable = 6;
+}
+
+message WaitForActiveAssetChannelResponse {}
+
+message SendChannelPaymentRequest {
+  Network network = 1;
+  string channel_id = 2;
+  map<string, SendAmount> asset_amounts = 3; // key: asset_id
+  optional Hashlock hashlock = 4;
+  optional uint64 expiry_timeout_secs = 5;
+}
+
+message SendChannelPaymentResponse { string payment_id = 1; }
+
+message EstimateSendPaymentFeeRequest {
+  Network network = 1;
+  string recipient_node_id = 2;
+  map<string, SendAmount> asset_amounts = 3; // key: asset_id
+  optional Hashlock hashlock = 4;
+  optional uint64 expiry_timeout_secs = 5;
+}
+
+message EstimateSendPaymentFeeResponse {
+  map<string, DecimalString> fees = 1; // key: asset_id
+}
+
+message SendPaymentRequest {
+  Network network = 1;
+  string recipient_node_id = 2;
+  map<string, SendAmount> asset_amounts = 3; // key: asset_id
+  optional Hashlock hashlock = 4;
+  optional uint64 expiry_timeout_secs = 5;
+}
+
+message SendPaymentResponse { string payment_id = 1; }
+
+message CreateInvoiceRequest {
+  Network network = 1;
+  string asset_id = 2;
+  optional DecimalString amount = 3;
+  optional Hashlock hashlock = 4;
+  optional uint64 expiry_timeout_secs = 5;
+}
+
+message CreateInvoiceResponse { Invoice invoice = 1; }
+
+message DecodeInvoiceRequest {
+  Network network = 1;
+  string payment_request = 2;
+}
+
+message DecodeInvoiceResponse { Invoice invoice = 1; }
+
+message EstimatePayInvoiceFeeRequest {
+  Network network = 1;
+  string payment_request = 2;
+}
+
+message EstimatePayInvoiceFeeResponse { DecimalString fee = 1; }
+
+message EstimatePayEmptyInvoiceFeeRequest {
+  Network network = 1;
+  string payment_request = 2;
+  SendAmount amount = 3;
+}
+
+message EstimatePayEmptyInvoiceFeeResponse { DecimalString fee = 1; }
+
+message PayEmptyInvoiceRequest {
+  Network network = 1;
+  string payment_request = 2;
+  SendAmount amount = 3;
+}
+
+message PayEmptyInvoiceResponse { string payment_id = 1; }
+
+message PayInvoiceRequest {
+  Network network = 1;
+  string payment_request = 2;
+}
+
+message PayInvoiceResponse { string payment_id = 1; }
+
+message ResolveHashlockPaymentRequest {
+  Network network = 1;
+  string payment_id = 2;
+  string payment_preimage = 3;
+}
+
+message ResolveHashlockPaymentResponse {}
+
+message RejectPaymentRequest {
+  Network network = 1;
+  string payment_id = 2;
+}
+
+message RejectPaymentResponse {}
+
+message AllowDualFundedChannelRequest {
+  Network network = 1;
+  string node_id = 2;
+  map<string, DualFundAmount> asset_amounts = 3; // key: asset_id
+}
+
+message AllowDualFundedChannelResponse {}

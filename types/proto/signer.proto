@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+
+// Signer service definition for managing cryptographic operations.
+// This service provides methods for signing messages and
+// verifying signatures.
+service SignerService {
+  // Sign a message using the wallet's signer for a specific network.
+  rpc SignMessage(SignMessageRequest) returns (SignMessageResponse) {}
+  // Sign a message using the node's signer for a specific network.
+  rpc NodeSignMessage(SignMessageRequest) returns (SignMessageResponse) {}
+  // Verify the validity of a client's signature on a message for a
+  // specific network.
+  rpc VerifySignature(VerifySignatureRequest)
+      returns (VerifySignatureResponse) {}
+}
+
+message SignMessageRequest {
+  Network network = 1;
+  Message message = 2;
+}
+
+message SignMessageResponse { bytes signature = 1; }
+
+message VerifySignatureRequest {
+  Network network = 1;
+  Message message = 2;
+  string public_key = 3;
+  bytes signature = 4;
+}
+
+message VerifySignatureResponse { bool valid = 1; }

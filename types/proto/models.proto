@@ -1,0 +1,576 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "google/protobuf/timestamp.proto";
+
+enum Protocol {
+  BITCOIN = 0;
+  EVM = 1;
+}
+
+message Network {
+  Protocol protocol = 1;
+  string id = 2;
+}
+
+message BlockHeader {
+  uint64 number = 1;
+  string hash = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  string prev_hash = 4;
+}
+
+message Asset {
+  string id = 1;
+  string name = 2;
+  string symbol = 3;
+  uint32 decimals = 4;
+}
+
+message DecimalString { string value = 1; }
+
+message U256String { string value = 1; }
+
+message Message {
+  message Data { bytes data = 1; }
+  message Hash { bytes hash = 1; }
+  message Typed { bytes payload = 1; }
+
+  oneof message {
+    Data data = 1;
+    Hash hash = 2;
+    Typed typed = 3;
+  }
+}
+
+message Deadline {
+  message Timestamp { google.protobuf.Timestamp timestamp = 1; }
+  message TimeDelta { uint64 seconds = 1; }
+  message BlockNumber { uint64 block_number = 1; }
+  message BlockDelta { uint64 block_delta = 1; }
+
+  oneof deadline {
+    Timestamp timestamp = 1;
+    TimeDelta time_delta = 2;
+    BlockNumber block_number = 3;
+    BlockDelta block_delta = 4;
+  }
+}
+
+message FeeRate {
+  U256String max_tip_fee_per_unit = 1;
+  U256String max_fee_per_unit = 2;
+}
+
+message ChainFee {
+  U256String base_fee_per_unit = 1;
+  U256String max_tip_fee_per_unit = 2;
+  U256String max_fee_per_unit = 3;
+}
+
+message FeeEstimate {
+  ChainFee low = 1;
+  ChainFee medium = 2;
+  ChainFee high = 3;
+}
+
+message FeeOption {
+  message Low {}
+  message Medium {}
+  message High {}
+  message Custom { FeeRate fee_rate = 1; }
+
+  oneof fee_option {
+    Low low = 1;
+    Medium medium = 2;
+    High high = 3;
+    Custom custom = 4;
+  }
+}
+
+message OnchainBalance {
+  // Tha amount of asset that is available for spending on-chain.
+  DecimalString usable = 1;
+  // The amount of asset that is pending confirmation on-chain.
+  // This will become usable once the transaction has reached the required
+  // number of confirmations for finality.
+  DecimalString pending = 2;
+}
+
+message OffchainBalance {
+  // The amount of asset on the local side of the channels that is free to
+  // spend.
+  DecimalString free_local = 1;
+  // The amount of asset on the remote side of the channels that can be
+  // received.
+  DecimalString free_remote = 2;
+  // The amount of asset that is pending confirmation on the local side.
+  // This can include asset that is locked in channels that are being opened
+  // or updated.
+  DecimalString pending_local = 3;
+  // The amount of asset that is pending confirmation on the remote side.
+  // This can include asset that is locked in channels that are being opened
+  // or updated.
+  DecimalString pending_remote = 4;
+  // The amount of asset that is unavailable for spending on the local side.
+  // This can include local assets that are locked in channels that are
+  // inactive, closed, or being closed.
+  DecimalString unavailable_local = 5;
+  // The amount of asset that is unavailable for spending on the remote side.
+  // This can include local assets that are locked in channels that are
+  // inactive, closed, or being closed.
+  DecimalString unavailable_remote = 6;
+  // The amount of asset that is locked in pending channel payments sent to the
+  // counterparty.
+  DecimalString paying_local = 7;
+  // The amount of asset that is locked in pending channel payments received
+  // from the counterparty.
+  DecimalString paying_remote = 8;
+  // The amount of local asset that is reserved for punishment in case of a
+  // channel dispute or for paying fees in case of a channel closure.
+  DecimalString unspendable_local_reserve = 9;
+  // The amount of remote asset that is reserved for punishment in case of a
+  // channel dispute or for paying fees in case of a channel closure.
+  DecimalString unspendable_remote_reserve = 10;
+}
+
+message Balance {
+  OnchainBalance onchain = 1;
+  OffchainBalance offchain = 2;
+}
+
+message SendAmount {
+  message All {}
+  message Exact { DecimalString amount = 1; }
+
+  oneof amount {
+    All all = 1;
+    Exact exact = 2;
+  }
+}
+
+message DualFundAmount {
+  // Amount of the asset going to self in the channel
+  DecimalString local = 1;
+  // Amount of the asset going to the counterparty in the channel
+  DecimalString remote = 2;
+  // Amount of the asset deposited by self in the channel
+  DecimalString self_deposit = 3;
+}
+
+message AllowanceAmount {
+  message Unlimited {}
+  message Exact { DecimalString amount = 1; }
+
+  oneof amount {
+    Unlimited unlimited = 1;
+    Exact exact = 2;
+  }
+}
+
+message SetAllowance {
+  message Contract {
+    string contract_address = 1;
+    string token_variant = 2;
+    bool approved = 3;
+  }
+  message UniqueToken {
+    string token_id = 1;
+    bool approved = 2;
+  }
+  message Token {
+    string token_id = 1;
+    AllowanceAmount amount = 2;
+  }
+
+  oneof set_allowance {
+    Contract contract = 1;
+    UniqueToken unique_token = 2;
+    Token token = 3;
+  }
+}
+
+message Allowance {
+  message Contract {
+    string contract_address = 1;
+    string token_variant = 2;
+    bool approved = 3;
+  }
+  message UniqueToken {
+    Asset token = 1;
+    bool approved = 2;
+  }
+  message Token {
+    Asset token = 1;
+    AllowanceAmount amount = 2;
+  }
+
+  oneof allowance {
+    Contract contract = 1;
+    UniqueToken unique_token = 2;
+    Token token = 3;
+  }
+}
+
+message Transaction {
+  enum TxStatus {
+    UNKNOWN = 0;
+    IN_MEMPOOL = 1;
+    PENDING_CONFIRMATIONS = 2;
+    COMPLETED = 3;
+    FAILED = 4;
+  }
+
+  string id = 1;
+  TxStatus status = 2;
+  uint64 confirmations = 3;
+  optional uint64 block_height = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  DecimalString fee = 6;
+  map<string, DecimalString> spent = 7;    // key: asset_id
+  map<string, DecimalString> received = 8; // key: asset_id
+  repeated Operation operations = 9;
+  bytes metadata = 10;
+}
+
+message Operation {
+  message Send {
+    string asset_id = 1;
+    optional string to = 2;
+    DecimalString amount = 3;
+  }
+
+  message Receive {
+    string asset_id = 1;
+    optional string from = 2;
+    DecimalString amount = 3;
+  }
+
+  message SelfTransfer {
+    string asset_id = 1;
+    DecimalString amount = 2;
+  }
+
+  oneof operation {
+    Send send = 1;
+    Receive receive = 2;
+    SelfTransfer self_transfer = 3;
+  }
+}
+
+enum ChannelStatus {
+  INACTIVE = 0;
+  ACTIVE = 1;
+  UPDATING = 2;
+  CLOSED = 3;
+  CLOSED_REDEEMABLE = 4;
+}
+
+message Channel {
+  string id = 1;
+  string counterparty = 2;
+  ChannelStatus status = 3;
+  map<string, AssetChannel> asset_channels = 4; // key: asset_id
+}
+
+enum Disputer {
+  LOCAL = 0;
+  REMOTE = 1;
+  WATCHTOWER = 2;
+}
+
+message AssetChannelStatus {
+  message CooperativelyOpening {}
+  message Opening {}
+  message CooperativelyUpdating {}
+  message Updating {}
+  message CooperativelyClosing {}
+  message Closing { uint64 closed_at_block = 1; }
+  message ForceClosing {
+    /// The block number at which the channel was force-closed
+    /// Optional the transaction might be broadcasted but not confirmed yet
+    optional uint64 force_closed_at_block = 1;
+    /// The disputer of the channel
+    Disputer disputer = 2;
+    /// The deadline until which the channel can be disputed onchain
+    optional Deadline dispute_deadline = 3;
+  }
+  message ClosedRedeemable {}
+  message Closed {}
+  message Inactive {}
+  message ActiveSending {}
+  message ActiveReceiving {}
+  message Active {}
+  message Recovering {}
+
+  oneof status {
+    CooperativelyOpening cooperatively_opening = 1;
+    Opening opening = 2;
+    CooperativelyUpdating cooperatively_updating = 3;
+    Updating updating = 4;
+    CooperativelyClosing cooperatively_closing = 5;
+    Closing closing = 6;
+    ForceClosing force_closing = 7;
+    ClosedRedeemable closed_redeemable = 8;
+    Closed closed = 9;
+    Inactive inactive = 10;
+    ActiveSending active_sending = 11;
+    ActiveReceiving active_receiving = 12;
+    Active active = 13;
+    Recovering recovering = 14;
+  }
+}
+
+message AssetChannel {
+  AssetChannelStatus status = 1;
+  OffchainBalance balance = 2;
+  optional string last_onchain_txid = 3;
+  uint64 last_operation_confirmations = 4;
+  google.protobuf.Timestamp last_operation_timestamp = 5;
+  bool is_updatable = 6;
+}
+
+message PaymentStatus {
+  message Pending {}
+  message PendingPreimage { optional Deadline resolution_deadline = 1; }
+  message Completed {}
+  message Expired {}
+  message Failed {}
+  message Rejected {}
+
+  oneof status {
+    Pending pending = 1;
+    PendingPreimage pending_preimage = 2;
+    Completed completed = 3;
+    Expired expired = 4;
+    Failed failed = 5;
+    Rejected rejected = 6;
+  }
+}
+
+message Payment {
+  string id = 1;
+  optional string hash = 2;
+  optional string preimage = 3;
+  PaymentStatus status = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  map<string, DecimalString> spent = 6;    // key: asset_id
+  map<string, DecimalString> received = 7; // key: asset_id
+  repeated PaymentOperation operations = 8;
+}
+
+/// An operation in a payment
+message PaymentOperation {
+  /// We sent a payment
+  message Send {
+    /// The asset being sent
+    string asset_id = 1;
+    /// The recipient of the payment
+    string to = 2;
+    /// The amount intended for the recipient
+    DecimalString recipient_amount = 3;
+    /// The shards of the payment
+    repeated SendingPaymentShard shards = 4;
+  }
+  /// We received a payment
+  message Receive {
+    /// The asset being received
+    string asset_id = 1;
+    /// The sender of the payment
+    optional string from = 2;
+    /// The amount intended for the recipient
+    DecimalString recipient_amount = 3;
+    /// The shards of the payment
+    repeated ReceivingPaymentShard shards = 4;
+  }
+  /// We routed a payment
+  message Route {
+    /// The asset being routed
+    string asset_id = 1;
+    /// The channel id of previous hop of the routed payment
+    string routed_from_channel_id = 2;
+    /// The node public key of previous hop of the routed payment
+    string routed_from_node_id = 3;
+    /// The channel id of next hop of the routed payment
+    string routed_to_channel_id = 4;
+    /// The node public key of next hop of the routed payment
+    string routed_to_node_id = 5;
+    /// The amount being routed (including fees)
+    DecimalString amount = 6;
+    /// The fee earned for routing the payment
+    DecimalString earned_fee = 7;
+  }
+
+  oneof operation {
+    Send send = 1;
+    Receive receive = 2;
+    Route route = 3;
+  }
+}
+
+/// Represents a shard of an outgoing payment through a specific channel to a
+/// counterparty.
+message SendingPaymentShard {
+  /// The channel used in the next hop for this shard.
+  string channel_id = 1;
+  /// The counterparty node for the next hop for this shard.
+  string counterparty = 2;
+  /// The amount transferred in this shard (including fees).
+  DecimalString amount = 3;
+  /// The fee paid in the path for this shard.
+  DecimalString fee = 4;
+}
+
+/// Represents a shard of an incoming payment through a specific channel from a
+/// counterparty.
+message ReceivingPaymentShard {
+  /// The channel used in the previous hop for this shard.
+  string channel_id = 1;
+  /// The counterparty node for the previous hop for this shard.
+  string counterparty = 2;
+  /// The amount received in this shard.
+  DecimalString amount = 3;
+}
+
+message Invoice {
+  Network network = 1;
+  // The string representation of the invoice that can be used to pay it.
+  string payment_request = 2;
+  string payment_hash = 3;
+  string payment_secret = 4;
+  string asset_id = 5;
+  optional U256String amount = 6;
+  string recipient = 7;
+  optional google.protobuf.Timestamp expiry_timestamp = 8;
+  bytes signature = 9;
+  bytes signable_hash = 10;
+}
+
+message Hashlock {
+  message Known { string preimage = 1; }
+  message Unknown { string hash = 1; }
+
+  oneof hashlock {
+    Known known = 1;
+    Unknown unknown = 2;
+  }
+}
+
+message ClientEvent {
+  message Syncing {}
+  message Synced {}
+  message NewBlock { uint64 number = 1; }
+  message TransactionUpdate { Transaction transaction = 1; }
+  message TransactionRemoved { string txid = 1; }
+  message BalanceUpdate {
+    string asset_id = 1;
+    Balance balance = 2;
+  }
+
+  oneof event {
+    Syncing syncing = 1;
+    Synced synced = 2;
+    NewBlock new_block = 3;
+    TransactionUpdate transaction_update = 4;
+    TransactionRemoved transaction_removed = 5;
+    BalanceUpdate balance_update = 6;
+  }
+}
+
+message NodeEvent {
+  message Syncing {}
+  message Synced {}
+  message ChannelUpdate { Channel channel = 1; }
+  message ChannelClosed { string channel_id = 1; }
+  message AssetChannelUpdate {
+    string channel_id = 1;
+    string asset_id = 2;
+    AssetChannel asset_channel = 3;
+  }
+  message AssetChannelClosed {
+    string channel_id = 1;
+    string asset_id = 2;
+  }
+  message PaymentUpdate { Payment payment = 1; }
+  message PeerConnected { string node_id = 1; }
+  message PeerDisconnected { string node_id = 1; }
+  message WatchtowerConnected { string node_id = 1; }
+  message WatchtowerDisconnected { string node_id = 1; }
+
+  oneof event {
+    Syncing syncing = 1;
+    Synced synced = 2;
+    ChannelUpdate channel_update = 3;
+    ChannelClosed channel_closed = 4;
+    AssetChannelUpdate asset_channel_update = 5;
+    AssetChannelClosed asset_channel_closed = 6;
+    PaymentUpdate payment_update = 7;
+    PeerConnected peer_connected = 8;
+    PeerDisconnected peer_disconnected = 9;
+    WatchtowerConnected watchtower_connected = 10;
+    WatchtowerDisconnected watchtower_disconnected = 11;
+  }
+}
+
+enum FiatCurrency {
+  USD = 0;
+  EUR = 1;
+  GBP = 2;
+  AUD = 3;
+  CAD = 4;
+  CHF = 5;
+  CNY = 6;
+  JPY = 7;
+  KRW = 8;
+  RUB = 9;
+  TRY = 10;
+  INR = 11;
+}
+
+message OrderbookCurrency {
+  Protocol protocol = 1;
+  string network_id = 2;
+  string asset_id = 3;
+}
+
+message SwapAmount {
+  message From { DecimalString amount = 1; }
+  message To { DecimalString amount = 1; }
+
+  oneof amount {
+    From from = 1;
+    To to = 2;
+  }
+}
+
+// Represents a match of an order in the orderbook for a pair of currencies.
+message PairOrderMatch {
+  // The currency being sent
+  OrderbookCurrency sending_currency = 1;
+  // The currency being received
+  OrderbookCurrency receiving_currency = 2;
+  // The matched amount being sent
+  DecimalString sending_amount = 3;
+  // The matched amount being received
+  DecimalString receiving_amount = 4;
+  // The fee paid in the receiving currency
+  DecimalString receiving_fee = 5;
+  // The slippage of the order ((average price of order - best price of order)
+  // / best price of order)
+  DecimalString slippage = 6;
+}
+
+// Represents a match of an order in the orderbook for a swap between two
+// currencies. It can either be a single pair order match or a swap that
+// involves multiple pair order matches.
+message OrderMatch {
+  message Pair { PairOrderMatch pair_order_match = 1; }
+
+  message Swap { repeated PairOrderMatch pair_order_matches = 1; }
+
+  oneof order_match {
+    Pair pair = 1;
+    Swap swap = 2;
+  }
+}

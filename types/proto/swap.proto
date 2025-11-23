@@ -1,0 +1,357 @@
+syntax = "proto3";
+
+package hydra_app;
+
+import "models.proto";
+import "google/protobuf/timestamp.proto";
+
+// Swap service definition for performing swap operations.
+service SwapService {
+  // Estimate the order matching for a swap operation between two currencies for
+  // a certain amount. For a market swap to be performed, the user must have
+  // enough offchain balance for both the sending and receiving currencies.
+  rpc EstimateSwap(EstimateSwapRequest) returns (EstimateSwapResponse) {}
+  // Perform a swap operation between two currencies for a certain amount. The
+  // user must have enough offchain balance for both the sending and receiving
+  // currencies.
+  rpc Swap(SwapRequest) returns (SwapResponse) {}
+  // Estimate the fees for setting up channels (via openings, deposits and/or
+  // rentals) to then be able to perform a swap operation between two currencies
+  // for a certain amount. This also returns the estimate of the order matching
+  // in the current orderbook state.
+  rpc EstimateSimpleSwap(EstimateSimpleSwapRequest)
+      returns (EstimateSimpleSwapResponse) {}
+  // This method is used to automatically set up channels (via openings,
+  // deposits and/or rentals) to then be able to perform a swap operation
+  // between two currencies for a certain amount. The user does not need to have
+  // enough offchain balance for both the sending and receiving currencies as
+  // the channels will be automatically set up. The user will be charged for the
+  // onchain fees needed to set up the channels. The swap operation will be
+  // performed after the channels are ready.
+  rpc SimpleSwap(SimpleSwapRequest) returns (SimpleSwapResponse) {}
+  // This method is used to subscribe to the updates of simple swaps.
+  // The user will receive updates about the swap operation, including the
+  // status of the channels being set up, the order matching, and the final
+  // result of the swap.
+  rpc SubscribeSimpleSwaps(SubscribeSimpleSwapsRequest)
+      returns (stream SimpleSwapUpdate) {}
+}
+
+message EstimateSwapRequest {
+  OrderbookCurrency sending_currency = 1;
+  OrderbookCurrency receiving_currency = 2;
+  SwapAmount amount = 3;
+}
+
+message EstimateSwapResponse { optional OrderMatch order_match = 1; }
+
+message SwapRequest {
+  OrderbookCurrency sending_currency = 1;
+  OrderbookCurrency receiving_currency = 2;
+  SwapAmount amount = 3;
+}
+
+message SwapResponse { string order_id = 1; }
+
+message EstimateSimpleSwapRequest {
+  OrderbookCurrency sending_currency = 1;
+  OrderbookCurrency receiving_currency = 2;
+  SwapAmount amount = 3;
+  // The maximum tolerance for the price change in the orderbook when the swap
+  // is performed. This is used to make sure that the swap is performed at a
+  // price that is not too far from the price intended by the user at the
+  // beginning of the operation. The price change tolerance is expressed as
+  // (max_tolerated_price - intended_price) / intended_price. This applies to
+  // both buys and sells, thus it's an absolute value.
+  DecimalString price_change_tolerance = 4;
+  // Whether to withdraw back onchain the sent funds at the end of the swap
+  // operation.
+  bool withdraw_sending_funds = 5;
+  // Whether to withdraw back onchain the received funds at the end of the swap
+  // operation.
+  bool withdraw_receiving_funds = 6;
+}
+
+message SendingChannelDeposit {
+  DecimalString amount = 1;
+  DecimalString unspendable_reserve = 2;
+  DecimalString fee = 3;
+  FeePaymentCurrency fee_payment_currency = 4;
+  string counterparty = 5;
+  // Channel id of the channel to deposit to. None if opening a new channel
+  optional string deposit_channel_id = 6;
+}
+
+message ReceivingChannelRental {
+  DecimalString amount = 1;
+  DecimalString unspendable_reserve = 2;
+  DecimalString rental_fee = 3;
+  FeeRate rental_tx_fee_rate = 4;
+  // Whether the rental fee is paid with the sending asset of the simple swap.
+  bool pay_with_sending = 5;
+}
+
+message DualFundDeposit {
+  DecimalString self_amount = 1;
+  DecimalString counterparty_amount = 2;
+  DecimalString unspendable_self_reserve = 3;
+  DecimalString unspendable_counterparty_reserve = 4;
+  DecimalString fee = 5;
+  FeePaymentCurrency fee_payment_currency = 6;
+  bool is_opening = 7;
+}
+
+enum FeePaymentCurrency {
+  // The fee is paid with the sending asset of the simple swap.
+  SENDING = 0;
+  // The fee is paid with the receiving asset of the simple swap.
+  RECEIVING = 1;
+  // The fee is paid with the native asset of the involved network, that is not
+  // the sending or receiving asset of the simple swap.
+  NATIVE = 2;
+}
+
+message WithdrawalFee {
+  // The fee amount.
+  DecimalString fee = 1;
+  // The fee payment currency.
+  FeePaymentCurrency fee_payment_currency = 2;
+}
+
+message SimpleSwapEstimate {
+  // There are enough sending and receiving funds in the channels, thus the swap
+  // order will be performed immediately
+  message Instant {
+    OrderMatch order_match = 1;
+    optional WithdrawalFee sending_withdrawal_fee = 2;
+    optional WithdrawalFee receiving_withdrawal_fee = 3;
+  }
+  // There are not enough sending and/or receiving funds in the channels, thus
+  // the swap order will be performed after setting up the channels.
+  // This can be done by either depositing funds in the channels or renting a
+  // channel for the receiving asset.
+  message Deferred {
+    OrderMatch order_match = 1;
+    optional SendingChannelDeposit sending_channel_deposit = 2;
+    optional ReceivingChannelRental receiving_channel_rental = 3;
+    optional WithdrawalFee sending_withdrawal_fee = 4;
+    optional WithdrawalFee receiving_withdrawal_fee = 5;
+  }
+  // There are not enough sending and/or receiving funds in the channels, thus
+  // the swap order will be performed after setting up the channels.
+  // This can be done by dual-funding both sending and receiving funds in a
+  // channel.
+  message DualFundDeferred {
+    OrderMatch order_match = 1;
+    DualFundDeposit dual_fund_deposit = 2;
+    optional WithdrawalFee sending_withdrawal_fee = 3;
+    optional WithdrawalFee receiving_withdrawal_fee = 4;
+  }
+  // The user does not have enough onchain balance for the simple swap to be
+  // performed, as the amount needed to set up the channels is greater than
+  // the onchain balance available.
+  message NotEnoughBalance { DecimalString needed_onchain_sending = 1; }
+  // The fees that would be paid to set up the channels are higher than the
+  // amount to be swapped, thus the swap cannot be performed.
+  message FeesHigherThanAmount {
+    // The fees in the sending currency that would be paid for the simple swap.
+    DecimalString sending_fee = 1;
+    // The fees in the receiving currency that would be paid for the simple
+    // swap.
+    DecimalString receiving_fee = 2;
+  }
+  // The swap order cannot be performed because the rental amount needed to
+  // set up the channels is greater than the available liquidity or the max
+  // rental capacity. of the rental liquidity provider.
+  message RentalTooBig {
+    DecimalString needed_rental = 1;
+    DecimalString available_rental_liquidity = 2;
+    DecimalString max_rental_capacity = 3;
+  }
+  // The swap order cannot be performed because there's no liquidity available
+  // between the sending and receiving currencies in the orderbook.
+  message NoLiquidity {}
+
+  oneof estimate {
+    Instant instant = 1;
+    Deferred deferred = 2;
+    DualFundDeferred dual_fund_deferred = 3;
+    NotEnoughBalance not_enough_balance = 4;
+    FeesHigherThanAmount fees_higher_than_amount = 5;
+    RentalTooBig rental_too_big = 6;
+    NoLiquidity no_liquidity = 7;
+  }
+}
+
+message EstimateSimpleSwapResponse { SimpleSwapEstimate estimate = 1; }
+
+message SimpleSwapOutput {
+  // The swap order has been performed immediately.
+  message Instant {
+    string order_id = 1;
+    optional WithdrawalFee sending_withdrawal_fee = 2;
+    optional WithdrawalFee receiving_withdrawal_fee = 3;
+  }
+  // The swap order will be performed after setting up the channels by either
+  // depositing funds in the channels or renting a channel for the receiving
+  // asset.
+  message Deferred {
+    optional SendingChannelDeposit sending_channel_deposit = 1;
+    optional ReceivingChannelRental receiving_channel_rental = 2;
+    optional WithdrawalFee sending_withdrawal_fee = 3;
+    optional WithdrawalFee receiving_withdrawal_fee = 4;
+  }
+  // The swap order will be performed after setting up the channels by
+  // dual-funding both sending and receiving funds in a channel.
+  message DualFundDeferred {
+    DualFundDeposit dual_fund_deposit = 1;
+    optional WithdrawalFee sending_withdrawal_fee = 2;
+    optional WithdrawalFee receiving_withdrawal_fee = 3;
+  }
+
+  string simple_swap_id = 1;
+  oneof output {
+    Instant instant = 2;
+    Deferred deferred = 3;
+    DualFundDeferred dual_fund_deferred = 4;
+  }
+}
+
+message SimpleSwapRequest {
+  OrderbookCurrency sending_currency = 1;
+  OrderbookCurrency receiving_currency = 2;
+  SwapAmount amount = 3;
+  // The maximum tolerance for the price change in the orderbook when the swap
+  // is performed. This is used to make sure that the swap is performed at a
+  // price that is not too far from the price intended by the user at the
+  // beginning of the operation. The price change tolerance is expressed as
+  // (max_tolerated_price - intended_price) / intended_price. This applies to
+  // both buys and sells, thus it's an absolute value.
+  DecimalString price_change_tolerance = 4;
+  // Whether to withdraw back onchain the sent funds at the end of the swap
+  // operation.
+  bool withdraw_sending_funds = 5;
+  // Whether to withdraw back onchain the received funds at the end of the swap
+  // operation.
+  bool withdraw_receiving_funds = 6;
+}
+
+message SimpleSwapResponse { SimpleSwapOutput output = 1; }
+
+message SimpleSwapUpdate {
+  // The sending channel is being funded, either by opening a new channel or
+  // depositing in an existing one.
+  message FundingSendingChannel {
+    string txid = 1;
+    string channel_id = 2;
+    DecimalString amount = 3;
+    bool is_opening = 4;
+  }
+
+  // The receiving channel is being rented.
+  message RentingReceivingChannel {
+    string txid = 1;
+    string channel_id = 2;
+    DecimalString amount = 3;
+  }
+
+  // The channels are being dual-funded.
+  message DualFundingChannel {
+    string txid = 1;
+    string channel_id = 2;
+    DecimalString self_amount = 3;
+    DecimalString counterparty_amount = 4;
+    bool is_opening = 5;
+  }
+
+  // The sending channel is ready for the swap.
+  message SendingChannelReady { string channel_id = 1; }
+
+  // The receiving channel is ready for the swap.
+  message ReceivingChannelReady { string channel_id = 1; }
+
+  // The dual-funded channel is ready for the swap.
+  message DualFundChannelReady { string channel_id = 1; }
+
+  // Waiting for the balances to be ready for the swap.
+  message WaitingForBalances {
+    DecimalString needed_sending = 1;
+    DecimalString needed_receiving = 2;
+  }
+
+  // The balances are ready for the swap.
+  message BalancesReady {}
+
+  // The swap order has been created.
+  message OrderCreated { string order_id = 1; }
+
+  // The swap order has been completed.
+  message OrderCompleted {
+    string order_id = 1;
+    DecimalString sent_amount = 2;
+    DecimalString received_amount = 3;
+  }
+
+  // The sending funds are being withdrawn.
+  message WithdrawingSendingFunds {
+    repeated string txids = 1;
+    DecimalString self_amount = 2;
+    DecimalString counterparty_amount = 3;
+  }
+
+  // The receiving funds are being withdrawn.
+  message WithdrawingReceivingFunds {
+    repeated string txids = 1;
+    DecimalString self_amount = 2;
+    DecimalString counterparty_amount = 3;
+  }
+
+  // The dual-funded funds are being withdrawn.
+  message WithdrawingDualFundedFunds {
+    repeated string txids = 1;
+    DecimalString sending_self_amount = 2;
+    DecimalString sending_counterparty_amount = 3;
+    DecimalString receiving_self_amount = 4;
+    DecimalString receiving_counterparty_amount = 5;
+  }
+
+  // The sending funds have been withdrawn.
+  message SendingFundsWithdrawn {}
+
+  // The receiving funds have been withdrawn.
+  message ReceivingFundsWithdrawn {}
+
+  // The dual-funded funds have been withdrawn.
+  message DualFundedFundsWithdrawn {}
+
+  // The simple swap has been completed.
+  message SimpleSwapCompleted {}
+
+  // An error occurred during the simple swap.
+  message SimpleSwapError { string error = 1; }
+
+  google.protobuf.Timestamp timestamp = 1;
+  string simple_swap_id = 2;
+  oneof update {
+    FundingSendingChannel funding_sending_channel = 3;
+    RentingReceivingChannel renting_receiving_channel = 4;
+    DualFundingChannel dual_funding_channel = 5;
+    SendingChannelReady sending_channel_ready = 6;
+    ReceivingChannelReady receiving_channel_ready = 7;
+    DualFundChannelReady dual_fund_channel_ready = 8;
+    WaitingForBalances waiting_for_balances = 9;
+    BalancesReady balances_ready = 10;
+    OrderCreated order_created = 11;
+    OrderCompleted order_completed = 12;
+    WithdrawingSendingFunds withdrawing_sending_funds = 13;
+    WithdrawingReceivingFunds withdrawing_receiving_funds = 14;
+    WithdrawingDualFundedFunds withdrawing_dual_funded_funds = 15;
+    SendingFundsWithdrawn sending_funds_withdrawn = 16;
+    ReceivingFundsWithdrawn receiving_funds_withdrawn = 17;
+    DualFundedFundsWithdrawn dual_funded_funds_withdrawn = 18;
+    SimpleSwapCompleted simple_swap_completed = 19;
+    SimpleSwapError simple_swap_error = 20;
+  }
+}
+
+message SubscribeSimpleSwapsRequest {}
