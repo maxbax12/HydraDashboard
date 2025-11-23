@@ -139,9 +139,11 @@ The dashboard is fully responsive and works on:
 ## 🔗 Prerequisites
 
 - Node.js 18+ and npm
-- Running Hydra gRPC backend server
-- Envoy proxy configured for gRPC-Web (see backend documentation)
+- Running Hydra gRPC backend server (see Backend Setup section)
+- Docker & Docker Compose for running the backend
 
 ## 📄 License
 
-This project is part of the Hydra multi-network cryptocurrency system.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+Part of the Hydra multi-network cryptocurrency system.
